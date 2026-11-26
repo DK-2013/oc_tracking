@@ -1,0 +1,42 @@
+name: security
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install toolchain
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          install: true
+          cache: true
+
+      - name: Scan dependencies for vulnerabilities
+        run: mise run check:osv
+
+      - name: Scan secrets in git history
+        run: betterleaks git . --config .betterleaks.toml --no-banner --redact=100
+
+      - name: Check links
+        run: mise run check:links
+
+      - name: Check suppression review dates
+        run: node scripts/check-suppression-dates.mjs
